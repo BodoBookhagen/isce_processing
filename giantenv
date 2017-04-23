@@ -1,0 +1,7 @@
+export GIANT_DIR=/usr/local/src/ISCE/giant/GIAnT
+export GIANT=$GIANT_DIR
+export PYAPS=$GIANT_DIR
+export VARRES=$GIANT_DIR/varres
+export PYTHONPATH=$GIANT:$PYAPS:$VARRES
+export PATH=$GIANT_DIR/SCR:$PATH
+
