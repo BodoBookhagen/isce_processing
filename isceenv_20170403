@@ -1,0 +1,4 @@
+export ISCE_ROOT=/usr/local/src/ISCE/isce-2.0.0_20170403
+export ISCE_HOME=$ISCE_ROOT/isce
+export PATH=$ISCE_HOME/bin:$ISCE_HOME/applications:$PATH
+export PYTHONPATH=$ISCE_ROOT:$ISCE_HOME/applications:$ISCE_HOME/component:/usr/local/lib/python3.5/dist-packages
