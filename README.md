@@ -8,21 +8,21 @@ prepare_Sentinel1.py <indir> <baseline> --dem --dem_res --roi --box --label --pr
 ```
 
 with the following explanation:
-<indir>			directory to be processed (e.g., /raid/InSAR/Sentinel1A/NWArg)
-<baseline>		perpendicular baseline threshold in m
---dem			DEM to be used for processing (e.g., --dem /raid/InSAR/TerraSAR-X/Pocitos/SRTM1/demLat_S23_S26_Lon_W069_W066_f2.dem.wgs84.xml)
---roi			region of interest bounding box with S, N, W, E coordinates (include " ", e.g., --roi "[-24,-24.75,-67.25,-66.75]")
---box			bounding box with S, N, W, E coordinates (include " ", e.g., --box "[-24,-24.75,-67.25,-66.75]")
---label			text string indicating label of current area (e.g., --label "salta_lower_qdt")
---proc_steps		indicating level of processing (e.g., --proc_steps 0 (default) processes all band combinations that are below baseline threshold, --proc_steps 1 is only baseline generation, --proc_steps 2 will generate baselines and only one (first) ifg with full extent, --proc_steps 3 will generate ifgs using the first (oldest) as master with every other image and then only the next pairs)
-parser.add_argument('--dem_res', type=int, default=30, dest="dem_res", help='DEM resolution: default is 30 (m) for SRTM-X (use 10 m here for the WorldDEM). This is only used when converting TIF files to UTM coordinates.')
---geocode_reprocess	Reprocessing unwrapping with a new geocode bounding box. If geocode bounding box has changed and new geocoding is necessary, set this to 1 (e.g., --geocode_reprocess 1)
---do_not_delete		Delete .raw*, rangeOffset.*, resampImage.*, simamp.* after succesfull interferogram formation. Default = 0 to save space. Set this to 1 to keep all files (e.g., --do_not_delete 1)
---generate_utm_geotif	Generate geotifs for each interferogram pair. Generates geotif and automatically projects to appropriate UTM Zone X WGS84 coordinate system for all geocoded files. Default = 0 (no tif files are generated). Set this to 1 to generate geotifs (e.g., --generate_utm_geotif 1)
---orbit_dir		Orbit directory for Sentinel-1 orbits (e.g., --orbit_dir /raid/InSAR/orbits/S1/precise)
---aux_dir		Instrument and calibration auxiliary directory for Sentinel-1 (e.g., --aux_dir /raid/InSAR/orbits/S1/aux_ins)
---swath			Swath of Sentinel1 data (1 to 3, e.g., --swath "[1,2,3]" (default) or --swath "[2,3]" for only swaths 2 and 3)
---generate_png		Generate PNGs with mdx for each interferogram pair. Generates merged views with unwrapped topophase, phase, correlation, amplitude. Default = 0 (no PNG files are generated). Set this to 1 to generate png (e.g., --generate_png 1). You will need to install imagemick or similar packages to use this option
+- <indir>			directory to be processed (e.g., /raid/InSAR/Sentinel1A/NWArg)
+- <baseline>		perpendicular baseline threshold in m
+- --dem			DEM to be used for processing (e.g., --dem /raid/InSAR/TerraSAR-X/Pocitos/SRTM1/demLat_S23_S26_Lon_W069_W066_f2.dem.wgs84.xml)
+- --roi			region of interest bounding box with S, N, W, E coordinates (include " ", e.g., - --roi "[-24,-24.75,-67.25,-66.75]")
+- --box			bounding box with S, N, W, E coordinates (include " ", e.g., --box "[-24,-24.75,-67.25,-66.75]")
+- --label			text string indicating label of current area (e.g., --label "salta_lower_qdt")
+- --proc_steps		indicating level of processing (e.g., --proc_steps 0 (default) processes all band combinations that are below baseline threshold, --proc_steps 1 is only baseline generation, --proc_steps 2 will generate baselines and only one (first) ifg with full extent, --proc_steps 3 will generate ifgs using the first (oldest) as master with every other scene and then only adjacent pairs, --proc_steps -1 only generates xml control files and does no processing)
+- --dem_res			DEM resolution: default is 30 (m) for SRTM-X (use 10 m here for the TanDEM-X). This is only used when converting TIF files to UTM coordinates.
+- --geocode_reprocess	Reprocessing unwrapping with a new geocode bounding box. If geocode bounding box has changed and new geocoding is necessary, set this to 1 (e.g., --geocode_reprocess 1)
+- --do_not_delete		Delete .raw*, rangeOffset.*, resampImage.*, simamp.* after succesfull interferogram formation. Default = 0 to save space. Set this to 1 to keep all files (e.g., --do_not_delete 1)
+- --generate_utm_geotif	Generate geotifs for each interferogram pair. Generates geotif and automatically projects to appropriate UTM Zone X WGS84 coordinate system for all geocoded files. Default = 0 (no tif files are generated). Set this to 1 to generate geotifs (e.g., --generate_utm_geotif 1)
+- --orbit_dir		Orbit directory for Sentinel-1 orbits (e.g., --orbit_dir /raid/InSAR/orbits/S1/precise)
+- --aux_dir		Instrument and calibration auxiliary directory for Sentinel-1 (e.g., - --aux_dir /raid/InSAR/orbits/S1/aux_ins)
+- --swath			Swath of Sentinel1 data (1 to 3, e.g., --swath "[1,2,3]" (default) or --swath "[2,3]" for only swaths 2 and 3)
+- --generate_png		Generate PNGs with mdx for each interferogram pair. Generates merged views with unwrapped topophase, phase, correlation, amplitude. Default = 0 (no PNG files are generated). Set this to 1 to generate png (e.g., --generate_png 1). You will need to install imagemick or similar packages to use this option
 
 ## Example 1: Typical Sentinel-1 processing example
 Copy S1*_IW_SLC_*.zip files for one location (either ascending or descending, but not mixed) to a directory and generate a first interferogram to get extent of image and first impression. Also download the SRTM1 DEM using dem.py:
@@ -66,6 +66,7 @@ python2 isce_processing/prepare_Sentinel1.py /raid/InSAR/California/SCI/test 500
 --generate_png 1
 ```
 
+
 ## Example 3: Processing a subset of an IW Sentinel-1 swath
 In this example, the area of interest and area that will be geocoded is between two swaths. These will be automatically merged, clipped and geocoded
 
@@ -81,4 +82,18 @@ python2 /home/bodo/Dropbox/soft/ISCE/isce_processing/prepare_Sentinel1.py /raid/
 --do_not_delete 1 \
 --generate_utm_geotif 1 \
 --generate_png 1
+```
+
+
+## Example 4: Generating xml control files with no processing
+Generate only xml control files through --proc_steps -1. This will allow manual exploration of data and files.
+
+```
+python2 isce_processing/prepare_Sentinel1.py /raid/InSAR/California/SCI/test 500 \
+--label "S1_SCI_SRTM1_30m" \
+--dem "/raid/InSAR/California/SCI/SRTM1/demLat_N33_N35_Lon_W121_W119.dem.wgs84" \
+--proc_steps -1 \
+--roi "[34,34.5,-120,-119.2]" \
+--box "[33.917,34.112,-119.943,-119.479]" \
+--swath "[2]" \
 ```
