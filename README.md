@@ -49,7 +49,9 @@ Use QGIS or mdx.py to view the output in the merged directory. Identify the regi
 
 
 ## Example 2: Processing a subset of an IW Sentinel-1 swath
-After identifying area of interest, generate a list of interferograms with the first (oldest) images as master and all consecutive images as slave, followed by interferograms for the next pairs (Date2-Date3, Date3-Date4, Date4-Date5, etc). This is --proces_steps 3. Useful, for example, for damage proxy mapping or coherence analysis.
+After identifying area of interest, generate a list of interferograms with the first (oldest) images as master and all consecutive images as slave, followed by interferograms for the next pairs (Date2-Date3, Date3-Date4, Date4-Date5, etc). This is --proces_steps 3. Useful, for example, for damage proxy mapping or coherence analysis. This example will generate compiled PNGs of unwrapped phase, connected components, interferometric phase for each date pair and also a merged PDF containing all generated interferograms.
+
+Importantly, this example creates GeoTIFF files in GEOGRAPHIC-WGS84 coordinates and in their respective UTM projection in the merged directory.
 
 ```
 python2 isce_processing/prepare_Sentinel1.py /raid/InSAR/California/SCI/test 500 \
