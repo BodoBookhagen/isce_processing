@@ -8,8 +8,8 @@ prepare_Sentinel1.py <indir> <baseline> --dem --dem_res --roi --box --label --pr
 ```
 
 with the following explanation:
-- <indir>			directory to be processed (e.g., /raid/InSAR/Sentinel1A/NWArg)
-- <baseline>		perpendicular baseline threshold in m
+- __indir__			directory to be processed (e.g., /raid/InSAR/Sentinel1A/NWArg)
+- __baseline__		perpendicular baseline threshold in m
 - --dem			DEM to be used for processing (e.g., --dem /raid/InSAR/TerraSAR-X/Pocitos/SRTM1/demLat_S23_S26_Lon_W069_W066_f2.dem.wgs84.xml)
 - --roi			region of interest bounding box with S, N, W, E coordinates (include " ", e.g., - --roi "[-24,-24.75,-67.25,-66.75]")
 - --box			bounding box with S, N, W, E coordinates (include " ", e.g., --box "[-24,-24.75,-67.25,-66.75]")
