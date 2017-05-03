@@ -2,7 +2,7 @@
 
 """
 B. Bookhagen, Nov 23, 2015 version 0.1
-B. Bookhagen, May, 2017 version 0.11 
+B. Bookhagen, May, 2017 version 0.11
 """
 
 import subprocess, os, sys, shutil, math, glob, csv, datetime, time
@@ -28,7 +28,7 @@ los2_min = []
 los2_max = []
 
 
-parser = argparse.ArgumentParser(description='Process Sentinel1 radar data and generate interferograms.')
+parser = argparse.ArgumentParser(description='Process Sentinel1 radar data and generate interferograms (B. Bookhagen, bodo.bookhagen@uni-potsdam.de, v0.11)')
 parser.add_argument('indir', help='directory to be processed (e.g., /raid/InSAR/Sentinel1A/NWArg)')
 parser.add_argument('baseline', type=int, default=500, help='perpendicular baseline threshold in m')
 parser.add_argument('--dem', dest="dem", default = "", help='DEM to be used for processing (e.g., --dem /raid/InSAR/TerraSAR-X/Pocitos/SRTM1/demLat_S23_S26_Lon_W069_W066_f2.dem.wgs84.xml)')
@@ -119,7 +119,7 @@ else:
 if args.swath != "":
     swath = args.swath
 else:
-    swath = ""
+    swath = "[1,2,3]"
 
 print('Processing Sentinel1 data')
 print('Indir: ' + indir)
@@ -146,7 +146,7 @@ log_output_dir = os.path.join(indir, 'log_output')
 if os.path.exists(log_output_dir) == False:
     os.mkdir(log_output_dir)
 
-def generate_single_geotif_utm(dir2process, dir2process_merged, label_txt, baselinet_data, radarwavelength):
+def generate_single_geotif_utm(dir2process, dir2process_merged, date_str, label_txt, baselinet_data, radarwavelength):
     global conncomp_mean
     global conncomp_2use_idx
     global los_mean
@@ -155,7 +155,14 @@ def generate_single_geotif_utm(dir2process, dir2process_merged, label_txt, basel
     global los2_mean
     global los2_min
     global los2_max
-    
+
+    conncomp_out_fname = os.path.join(dir2process_merged, label_txt + '_conncomp_' + date_str + '.tif')
+    phsig_out_fname = os.path.join(dir2process_merged, label_txt + '_phsig_' + date_str + '.tif')
+    filttopohase_out_fname = os.path.join(dir2process_merged, label_txt + '_topophase_unw_' + date_str + '.tif')
+    filttopohase2stage_out_fname = os.path.join(dir2process_merged, label_txt + '_topophase_2stage_unw_' + date_str + '.tif')
+    amp_out_fname = os.path.join(dir2process_merged, label_txt + '_amp_' + date_str + '.tif')
+    topophasecor_out_fname = os.path.join(dir2process_merged, label_txt + '_topophase_cor_' + date_str + '.tif')
+
     date_str = str(int(baselinet_data[i,0])) + '_' + str(int(baselinet_data[i,1]))
     if os.path.exists('log') == False:
         os.mkdir('log')
@@ -164,20 +171,19 @@ def generate_single_geotif_utm(dir2process, dir2process_merged, label_txt, basel
     else:
         os.chdir(dir2process)
         print 'Converting connected components to geotif: ' + os.path.join(dir2process_merged, 'filt_topophase.unw.conncomp.geo')
-        cmd = ['isce2gis.py', 'vrt', '-i', 'merged/filt_topophase.unw.conncomp.geo']
-        logfile_fname = dir2process + '/log/isce2gis_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
-        logfile_error_fname = dir2process + '/log/isce2gis_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
-        with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
-            subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
-            subprocess_p.wait()
-        conncomp_out_fname = os.path.join(dir2process_merged, label_txt + '_conncomp_' + date_str + '.tif')
+#        cmd = ['isce2gis.py', 'vrt', '-i', 'merged/filt_topophase.unw.conncomp.geo']
+#        logfile_fname = dir2process + '/log/isce2gis_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
+#        logfile_error_fname = dir2process + '/log/isce2gis_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
+#        with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
+#            subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
+#            subprocess_p.wait()
         cmd = ['gdal_translate', '-b','1', '-co', 'COMPRESS=LZW', '-co', 'predictor=2', 'merged/filt_topophase.unw.conncomp.geo.vrt', conncomp_out_fname]
         logfile_fname = dir2process + '/log/gdal_translate_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
         logfile_error_fname = dir2process + '/log/gdal_translate_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
         with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
             subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
             subprocess_p.wait()
-        cmd = ['gdalinfo', '-hist','-stats', conncomp_out_fname]
+        cmd = ['gdalinfo', '-mm', '-hist','-stats', conncomp_out_fname]
         gdalinfo_conncomp_logfile_fname = dir2process + '/log/gdalinfo' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
         gdalinfo_conncomp_logfile_error_fname = dir2process + '/log/gdalinfo_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
         with open(gdalinfo_conncomp_logfile_fname, 'wb') as out, open(gdalinfo_conncomp_logfile_error_fname, 'wb') as err:
@@ -192,29 +198,75 @@ def generate_single_geotif_utm(dir2process, dir2process_merged, label_txt, basel
                     if float(right) > 0.1:
                         conncomp_2use_idx.append(i)
 
-    conncomp_out_fname = os.path.join(dir2process_merged, label_txt + '_conncomp_' + date_str + '.tif')
-    phsig_out_fname = os.path.join(dir2process_merged, label_txt + '_phsig_' + date_str + '.tif')
-    filttopohase_out_fname = os.path.join(dir2process_merged, label_txt + '_topophase_' + date_str + '.tif')
-    amp_out_fname = os.path.join(dir2process_merged, label_txt + '_amp_' + date_str + '.tif')
     if len(glob.glob(os.path.join(dir2process_merged, label_txt + '_phsig_*'  + '.tif'))) > 0:
         print 'Geotif exists for: ' + os.path.join(dir2process_merged, label_txt + '_phsig_*'  + '.tif')
     else:
         os.chdir(dir2process)
         date_str = str(int(baselinet_data[i,0])) + '_' + str(int(baselinet_data[i,1]))
         print 'Converting phase correlation to geotif: ' + os.path.join(dir2process_merged, 'phsig.cor.geo')
-        cmd = ['isce2gis.py', 'vrt', '-i', 'merged/phsig.cor.geo']
-        logfile_fname = dir2process + '/log/isce2gis_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
-        logfile_error_fname = dir2process + '/log/isce2gis_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
-        with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
-            subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
-            subprocess_p.wait()
+#        cmd = ['isce2gis.py', 'vrt', '-i', 'merged/phsig.cor.geo']
+#        logfile_fname = dir2process + '/log/isce2gis_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
+#        logfile_error_fname = dir2process + '/log/isce2gis_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
+#        with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
+#            subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
+#            subprocess_p.wait()
         cmd = ['gdal_translate', '-a_nodata', '0', '-b','1', '-co', 'COMPRESS=LZW', '-co', 'predictor=2', 'merged/phsig.cor.geo.vrt', phsig_out_fname]
         logfile_fname = dir2process + '/log/gdal_translate_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
         logfile_error_fname = dir2process + '/log/gdal_translate_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
         with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
             subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
             subprocess_p.wait()
-        cmd = ['gdalinfo', '-hist','-stats', phsig_out_fname]
+        cmd = ['gdalinfo', '-mm', '-hist','-stats', phsig_out_fname]
+        gdalinfo_conncomp_logfile_fname = dir2process + '/log/gdalinfo' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
+        gdalinfo_conncomp_logfile_error_fname = dir2process + '/log/gdalinfo_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
+        with open(gdalinfo_conncomp_logfile_fname, 'wb') as out, open(gdalinfo_conncomp_logfile_error_fname, 'wb') as err:
+            subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
+            subprocess_p.wait()
+
+    if len(glob.glob(os.path.join(dir2process_merged, label_txt + '_topophase_cor_*'  + '.tif'))) > 0:
+        print 'Geotif exists for: ' + os.path.join(dir2process_merged, label_txt + '_topophase_cor_*'  + '.tif')
+    else:
+        os.chdir(dir2process)
+        date_str = str(int(baselinet_data[i,0])) + '_' + str(int(baselinet_data[i,1]))
+        print 'Converting topophase correlation to geotif: ' + os.path.join(dir2process_merged, 'topophase.cor.geo')
+#        cmd = ['isce2gis.py', 'vrt', '-i', 'merged/phsig.cor.geo']
+#        logfile_fname = dir2process + '/log/isce2gis_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
+#        logfile_error_fname = dir2process + '/log/isce2gis_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
+#        with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
+#            subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
+#            subprocess_p.wait()
+        cmd = ['gdal_translate', '-a_nodata', '0', '-b','1', '-co', 'COMPRESS=LZW', '-co', 'predictor=2', 'merged/topophase.cor.geo.vrt', topophasecor_out_fname]
+        logfile_fname = dir2process + '/log/gdal_translate_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
+        logfile_error_fname = dir2process + '/log/gdal_translate_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
+        with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
+            subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
+            subprocess_p.wait()
+        cmd = ['gdalinfo', '-mm', '-hist','-stats', topophasecor_out_fname]
+        gdalinfo_conncomp_logfile_fname = dir2process + '/log/gdalinfo' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
+        gdalinfo_conncomp_logfile_error_fname = dir2process + '/log/gdalinfo_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
+        with open(gdalinfo_conncomp_logfile_fname, 'wb') as out, open(gdalinfo_conncomp_logfile_error_fname, 'wb') as err:
+            subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
+            subprocess_p.wait()
+
+    if len(glob.glob(os.path.join(dir2process_merged, label_txt + '_topophase_2stage_unw_*'  + '.tif'))) > 0:
+        print 'Geotif exists for: ' + os.path.join(dir2process_merged, label_txt + '_topophase_2stage_unw_*'  + '.tif')
+    else:
+        os.chdir(dir2process)
+        date_str = str(int(baselinet_data[i,0])) + '_' + str(int(baselinet_data[i,1]))
+        print 'Converting filtered, unwrapped topophase (2 stage) to geotif: ' + os.path.join(dir2process_merged, 'filt_topophase_2stage.unw.geo')
+#        cmd = ['isce2gis.py', 'vrt', '-i', 'merged/filt_topophase_2stage.unw.geo']
+#        logfile_fname = dir2process + '/log/isce2gis_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
+#        logfile_error_fname = dir2process + '/log/isce2gis_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
+#        with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
+#            subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
+#            subprocess_p.wait()
+        cmd = ['gdal_translate', '-a_nodata', '0', '-b','1', '-co', 'COMPRESS=LZW', '-co', 'predictor=2', 'merged/filt_topophase_2stage.unw.geo.vrt', filttopohase2stage_out_fname]
+        logfile_fname = dir2process + '/log/gdal_translate_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
+        logfile_error_fname = dir2process + '/log/gdal_translate_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
+        with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
+            subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
+            subprocess_p.wait()
+        cmd = ['gdalinfo', '-mm', '-hist','-stats', filttopohase2stage_out_fname]
         gdalinfo_conncomp_logfile_fname = dir2process + '/log/gdalinfo' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
         gdalinfo_conncomp_logfile_error_fname = dir2process + '/log/gdalinfo_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
         with open(gdalinfo_conncomp_logfile_fname, 'wb') as out, open(gdalinfo_conncomp_logfile_error_fname, 'wb') as err:
@@ -226,20 +278,20 @@ def generate_single_geotif_utm(dir2process, dir2process_merged, label_txt, basel
     else:
         os.chdir(dir2process)
         date_str = str(int(baselinet_data[i,0])) + '_' + str(int(baselinet_data[i,1]))
-        print 'Converting filtered topophase to geotif: ' + os.path.join(dir2process_merged, 'filt_topophase.unw.geo')
-        cmd = ['isce2gis.py', 'vrt', '-i', 'merged/filt_topophase.unw.geo']
-        logfile_fname = dir2process + '/log/isce2gis_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
-        logfile_error_fname = dir2process + '/log/isce2gis_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
-        with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
-            subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
-            subprocess_p.wait()
+        print 'Converting filtered, unwrapped topophase to geotif: ' + os.path.join(dir2process_merged, 'filt_topophase.unw.geo')
+#        cmd = ['isce2gis.py', 'vrt', '-i', 'merged/filt_topophase.unw.geo']
+#        logfile_fname = dir2process + '/log/isce2gis_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
+#        logfile_error_fname = dir2process + '/log/isce2gis_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
+#        with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
+#            subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
+#            subprocess_p.wait()
         cmd = ['gdal_translate', '-a_nodata', '0', '-b','2', '-co', 'COMPRESS=LZW', '-co', 'predictor=2', 'merged/filt_topophase.unw.geo.vrt', filttopohase_out_fname]
         logfile_fname = dir2process + '/log/gdal_translate_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
         logfile_error_fname = dir2process + '/log/gdal_translate_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
         with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
             subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
             subprocess_p.wait()
-        cmd = ['gdalinfo', '-hist','-stats', filttopohase_out_fname]
+        cmd = ['gdalinfo', '-mm', '-hist','-stats', filttopohase_out_fname]
         gdalinfo_conncomp_logfile_fname = dir2process + '/log/gdalinfo' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
         gdalinfo_conncomp_logfile_error_fname = dir2process + '/log/gdalinfo_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
         with open(gdalinfo_conncomp_logfile_fname, 'wb') as out, open(gdalinfo_conncomp_logfile_error_fname, 'wb') as err:
@@ -252,19 +304,19 @@ def generate_single_geotif_utm(dir2process, dir2process_merged, label_txt, basel
         os.chdir(dir2process)
         date_str = str(int(baselinet_data[i,0])) + '_' + str(int(baselinet_data[i,1]))
         print 'Converting amplitude to geotif: ' + os.path.join(dir2process_merged, 'filt_topophase.unw.geo')
-        cmd = ['isce2gis.py', 'vrt', '-i', 'merged/filt_topophase.unw.geo']
-        logfile_fname = dir2process + '/log/isce2gis_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
-        logfile_error_fname = dir2process + '/log/isce2gis_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
-        with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
-            subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
-            subprocess_p.wait()
+#        cmd = ['isce2gis.py', 'vrt', '-i', 'merged/filt_topophase.unw.geo']
+#        logfile_fname = dir2process + '/log/isce2gis_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
+#        logfile_error_fname = dir2process + '/log/isce2gis_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
+#        with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
+#            subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
+#            subprocess_p.wait()
         cmd = ['gdal_translate', '-a_nodata', '0', '-b','1', '-co', 'COMPRESS=LZW', '-co', 'predictor=2', 'merged/filt_topophase.unw.geo.vrt', amp_out_fname]
         logfile_fname = dir2process + '/log/gdal_translate_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
         logfile_error_fname = dir2process + '/log/gdal_translate_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
         with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
             subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
             subprocess_p.wait()
-        cmd = ['gdalinfo', '-hist','-stats', amp_out_fname]
+        cmd = ['gdalinfo', '-mm', '-hist','-stats', amp_out_fname]
         gdalinfo_conncomp_logfile_fname = dir2process + '/log/gdalinfo' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
         gdalinfo_conncomp_logfile_error_fname = dir2process + '/log/gdalinfo_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
         with open(gdalinfo_conncomp_logfile_fname, 'wb') as out, open(gdalinfo_conncomp_logfile_error_fname, 'wb') as err:
@@ -275,12 +327,12 @@ def generate_single_geotif_utm(dir2process, dir2process_merged, label_txt, basel
         print 'Geotif exists for: ' + os.path.join(dir2process_merged, label_txt + '_LOS_*'  + '.tif')
     else:
         print 'Converting LOS to geotif: ' + os.path.join(dir2process_merged, 'los.rdr.geo')
-        cmd = ['isce2gis.py', 'vrt', '-i', 'merged/los.rdr.geo']
-        logfile_fname = dir2process + '/log/isce2gis_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
-        logfile_error_fname = dir2process + '/log/isce2gis_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
-        with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
-            subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
-            subprocess_p.wait()
+#        cmd = ['isce2gis.py', 'vrt', '-i', 'merged/los.rdr.geo']
+#        logfile_fname = dir2process + '/log/isce2gis_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
+#        logfile_error_fname = dir2process + '/log/isce2gis_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
+#        with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
+#            subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
+#            subprocess_p.wait()
         los_out_fname = os.path.join(dir2process_merged, label_txt + '_los_' + date_str + '.tif')
         cmd = ['gdal_translate', '-b','1', '-co', 'COMPRESS=LZW', '-co', 'predictor=2', 'merged/los.rdr.geo.vrt', los_out_fname]
         logfile_fname = dir2process + '/log/gdal_translate_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
@@ -288,7 +340,7 @@ def generate_single_geotif_utm(dir2process, dir2process_merged, label_txt, basel
         with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
             subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
             subprocess_p.wait()
-        cmd = ['gdalinfo', '-hist','-stats', los_out_fname]
+        cmd = ['gdalinfo', '-mm', '-hist','-stats', los_out_fname]
         gdalinfo_los_logfile_fname = dir2process + '/log/gdalinfo' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
         gdalinfo_los_logfile_error_fname = dir2process + '/log/gdalinfo_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
         with open(gdalinfo_los_logfile_fname, 'wb') as out, open(gdalinfo_los_logfile_error_fname, 'wb') as err:
@@ -299,27 +351,28 @@ def generate_single_geotif_utm(dir2process, dir2process_merged, label_txt, basel
                 left,sep,right = line.partition('STATISTICS_MEAN=')
                 if sep: # True if 'STATISTICS_MEAN' in line
                     los_mean.append(float(right))
-                    print 'Mean of los: ' + str(float(right)),
+                    print 'Mean of los: ' + str(float(right)) + ', ',
         with open(gdalinfo_los_logfile_fname) as searchfile:
             for line in searchfile:
                 left,sep,right = line.partition('STATISTICS_MINIMUM=')
                 if sep: # True if 'STATISTICS_MEAN' in line
                     los_min.append(float(right))
-                    print 'Min of los: ' + str(float(right)),
+                    print 'Min of los: ' + str(float(right)) + ', ',
         with open(gdalinfo_los_logfile_fname) as searchfile:
             for line in searchfile:
                 left,sep,right = line.partition('STATISTICS_MAXIMUM=')
                 if sep: # True if 'STATISTICS_MEAN' in line
                     los_max.append(float(right))
                     print 'Max of los: ' + str(float(right))
+
         los2_out_fname = os.path.join(dir2process_merged, label_txt + '_los2_' + date_str + '.tif')
-        cmd = ['gdal_translate', '-b','2', '-co', 'COMPRESS=LZW', '-co', 'predictor=2', 'merged/los2.rdr.geo.vrt', los2_out_fname]
+        cmd = ['gdal_translate', '-b','2', '-co', 'COMPRESS=LZW', '-co', 'predictor=2', 'merged/los.rdr.geo.vrt', los2_out_fname]
         logfile_fname = dir2process + '/log/gdal_translate_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
         logfile_error_fname = dir2process + '/log/gdal_translate_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
         with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
             subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
             subprocess_p.wait()
-        cmd = ['gdalinfo', '-hist','-stats', los2_out_fname]
+        cmd = ['gdalinfo', '-mm', '-hist','-stats', los2_out_fname]
         gdalinfo_los_logfile_fname = dir2process + '/log/gdalinfo' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
         gdalinfo_los_logfile_error_fname = dir2process + '/log/gdalinfo_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
         with open(gdalinfo_los_logfile_fname, 'wb') as out, open(gdalinfo_los_logfile_error_fname, 'wb') as err:
@@ -330,13 +383,13 @@ def generate_single_geotif_utm(dir2process, dir2process_merged, label_txt, basel
                 left,sep,right = line.partition('STATISTICS_MEAN=')
                 if sep: # True if 'STATISTICS_MEAN' in line
                     los2_mean.append(float(right))
-                    print 'Mean of los2: ' + str(float(right)),
+                    print 'Mean of los2: ' + str(float(right)) + ', ',
         with open(gdalinfo_los_logfile_fname) as searchfile:
             for line in searchfile:
                 left,sep,right = line.partition('STATISTICS_MINIMUM=')
                 if sep: # True if 'STATISTICS_MEAN' in line
                     los2_min.append(float(right))
-                    print 'Min of los2: ' + str(float(right)),
+                    print 'Min of los2: ' + str(float(right)) + ', ',
         with open(gdalinfo_los_logfile_fname) as searchfile:
             for line in searchfile:
                 left,sep,right = line.partition('STATISTICS_MAXIMUM=')
@@ -347,18 +400,18 @@ def generate_single_geotif_utm(dir2process, dir2process_merged, label_txt, basel
 
         #radarwavelength = 0.05546576
         deltat_y = baselinet_data[i,2]
-        t = gdal.Open(filttopohase_out_fname)
+        t = gdal.Open(filttopohase2stage_out_fname)
         gt = t.GetGeoTransform()
         cs = t.GetProjection()
         cs_sr = osr.SpatialReference()
         cs_sr.ImportFromWkt(cs)
         del t
-        topophase = gdalnumeric.LoadFile(filttopohase_out_fname).astype(float)
+        topophase = gdalnumeric.LoadFile(filttopohase2stage_out_fname).astype(float)
         cols = topophase.shape[1]
         rows = topophase.shape[0]
         topophase_m_yr = (topophase * (radarwavelength/4*np.pi)) / float(deltat_y)
 
-        filttopohase_m_yr_out_fname = os.path.join(dir2process_merged, label_txt + '_topophase_m_yr_' + date_str + '.tif')
+        filttopohase_m_yr_out_fname = os.path.join(dir2process_merged, label_txt + '_LOS_deformation_m_yr_' + date_str + '.tif')
         driver = gdal.GetDriverByName('GTiff')
         driver.Register()
         outRaster = driver.Create(filttopohase_m_yr_out_fname, cols, rows, 1, gdal.GDT_Float32)
@@ -371,54 +424,10 @@ def generate_single_geotif_utm(dir2process, dir2process_merged, label_txt, basel
         outband.FlushCache()
         del driver, outRaster, topophase_m_yr, topophase
 
-#                if len(glob.glob(os.path.join(dir2process,os.path.join(dir2process, '*topophase_cor_' + os.path.basename(dir2process) + '.tif')))) > 0:
-#                    print 'Geotif exists for: ' + os.path.join(dir2process, 'topophase_cor_' + str(os.path.basename(dir2process)) + '.tif')
-#                else:
-#                    print 'Converting topophase coherence to geotif: ' + os.path.join(dir2process, 'topophase.cor.geo')
-#                    cmd = ['isce2gis.py', 'vrt', '-i', 'topophase.cor.geo']
-#                    logfile_fname = 'log/isce2gis_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
-#                    logfile_error_fname = 'log/isce2gis_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
-#                    with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
-#                        subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
-#                        subprocess_p.wait()
-#                    topophase_cor_out_fname = 'topophase_cor_' + os.path.basename(dir2process) + '.tif'
-#                    cmd = ['gdal_translate', '-a_nodata', '0', '-b','2', '-co', 'COMPRESS=LZW', '-co', 'predictor=2', 'topophase.cor.geo.vrt', topophase_cor_out_fname]
-#                    logfile_fname = 'log/gdal_translate_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
-#                    logfile_error_fname = 'log/gdal_translate_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
-#                    with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
-#                        subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
-#                        subprocess_p.wait()
-#
-#                if len(glob.glob(os.path.join(dir2process,'*amp' + os.path.basename(dir2process).split('_')[0] + '_from_*.tif'))) > 0:
-#                    print 'Geotif exists for: ' + os.path.join(dir2process, 'resampOnlyImage.amp.geo')
-#                else:
-#                    print 'Converting amplitude files to geotif: ' + os.path.join(dir2process, 'resampOnlyImage.amp.geo')
-#                    cmd = ['isce2gis.py', 'vrt', '-i', 'resampOnlyImage.amp.geo']
-#                    logfile_fname = 'log/isce2gis_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
-#                    logfile_error_fname = 'log/isce2gis_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
-#                    with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
-#                        subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
-#                        subprocess_p.wait()
-#                    amp_out_fname1 = 'amp' + os.path.basename(dir2process).split('_')[0] + '_from_' + os.path.basename(dir2process) + '.tif'
-#                    cmd = ['gdal_translate', '-a_nodata', '0', '-b','1', '-co', 'COMPRESS=LZW', '-co', 'predictor=2', 'resampOnlyImage.amp.geo.vrt', amp_out_fname1]
-#                    logfile_fname = 'log/gdal_translate_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
-#                    logfile_error_fname = 'log/gdal_translate_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
-#                    with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
-#                        subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
-#                        subprocess_p.wait()
-#
-#                    amp_out_fname2 = 'amp' + os.path.basename(dir2process).split('_')[1] + '_from_' + os.path.basename(dir2process) + '.tif'
-#                    cmd = ['gdal_translate', '-a_nodata', '0', '-b','2', '-co', 'COMPRESS=LZW', '-co', 'predictor=2', 'resampOnlyImage.amp.geo.vrt', amp_out_fname2]
-#                    logfile_fname = 'log/gdal_translate_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
-#                    logfile_error_fname = 'log/gdal_translate_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
-#                    with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
-#                        subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
-#                        subprocess_p.wait()
-
     #Get Zone information from vrt file:
     if (generate_utm_geotif == 1) or (len(glob.glob(os.path.join(dir2process_merged, label_txt + '_phsig_' + date_str + '_UTM*_WGS84.tif'))) == 0 or \
         len(glob.glob(os.path.join(dir2process_merged, label_txt + '_conncomp*' + date_str + '_UTM*_WGS84.tif'))) == 0 or \
-        len(glob.glob(os.path.join(dir2process_merged, label_txt + '_topophase_' + date_str + '_UTM*_WGS84.tif'))) == 0):
+        len(glob.glob(os.path.join(dir2process_merged, label_txt + '_topophase_unw_' + date_str + '_UTM*_WGS84.tif'))) == 0):
 
         if len(glob.glob(os.path.join(dir2process_merged, label_txt + '_phsig_' + date_str + '_UTM*_WGS84.tif'))) == 0:
             cmd = ['isce2gis.py', 'vrt', '-i', 'merged/phsig.cor.geo']
@@ -442,32 +451,36 @@ def generate_single_geotif_utm(dir2process, dir2process_merged, label_txt, basel
                 phsig_out_fname_utm = label_txt + '_phsig_'+ date_str + '_UTM' + Zone + 'N_WGS84.tif'
                 conncomp_out_fname_utm = label_txt + '_conncomp_' + date_str + '_UTM_' + Zone + 'N_WGS84.tif'
                 amp_out_fname_utm = label_txt + '_amp_' + date_str + '_UTM_' + Zone + 'N_WGS84.tif'
-                topophase_out_fname_utm = label_txt + '_topophase_' + date_str + '_UTM_' + Zone + 'N_WGS84.tif'
+                topophasecor_out_fname_utm = label_txt + '_topophase_cor_' + date_str + '_UTM_' + Zone + 'N_WGS84.tif'
+                topophase_out_fname_utm = label_txt + '_topophase_unw_' + date_str + '_UTM_' + Zone + 'N_WGS84.tif'
+                topophase2stage_out_fname_utm = label_txt + '_topophase_2stage_unw_' + date_str + '_UTM_' + Zone + 'N_WGS84.tif'
                 topophase_myr_out_fname_utm = label_txt + '_topophase_m_yr_' + date_str + '_UTM_' + Zone + 'N_WGS84.tif'
-                topophase_full_out_fname_utm = label_txt + 'FULL_topophase_m_yr_' + date_str + '_UTM_' + Zone + 'N_WGS84.tif'
             else:
                 phsig_out_fname_utm = 'phsig_'+ date_str + '_UTM' + Zone + 'N_WGS84.tif'
                 conncomp_out_fname_utm = 'conncomp_' + date_str + '_UTM_' + Zone + 'N_WGS84.tif'
+                topophasecor_out_fname_utm = 'topophase_cor_' + date_str + '_UTM_' + Zone + 'N_WGS84.tif'
                 topophase_out_fname_utm = 'topophase_' + date_str + '_UTM_' + Zone + 'N_WGS84.tif'
                 amp_out_fname_utm = 'amp_' + date_str + '_UTM_' + Zone + 'N_WGS84.tif'
+                topophase2stage_out_fname_utm = 'topophase_2stage_unw_' + date_str + '_UTM_' + Zone + 'N_WGS84.tif'
                 topophase_myr_out_fname_utm = 'topophase_m_yr_' + date_str + '_UTM_' + Zone + 'N_WGS84.tif'
-                topophase_full_out_fname_utm = 'FULL_topophase_m_yr_' + date_str + '_UTM_' + Zone + 'N_WGS84.tif'
         if Py < 0:
             prj = '+proj=utm +zone=' + Zone + ' +south +ellps=WGS84 +datum=WGS84 +units=m +no_defs'
             if label_txt <> "":
                 phsig_out_fname_utm = label_txt + '_phsig_'+ date_str + '_UTM' + Zone + 'S_WGS84.tif'
                 conncomp_out_fname_utm = label_txt + '_conncomp_' + date_str + '_UTM_' + Zone + 'S_WGS84.tif'
-                topophase_out_fname_utm = label_txt + '_topophase_' + date_str + '_UTM_' + Zone + 'S_WGS84.tif'
+                topophasecor_out_fname_utm = label_txt + '_topophase_cor_' + date_str + '_UTM_' + Zone + 'S_WGS84.tif'
+                topophase_out_fname_utm = label_txt + '_topophase_unw_' + date_str + '_UTM_' + Zone + 'S_WGS84.tif'
                 amp_out_fname_utm = label_txt + '_amp_' + date_str + '_UTM_' + Zone + 'S_WGS84.tif'
+                topophase2stage_out_fname_utm = label_txt + '_topophase_2stage_unw_' + date_str + '_UTM_' + Zone + 'S_WGS84.tif'
                 topophase_myr_out_fname_utm = label_txt + '_topophase_m_yr_' + date_str + '_UTM_' + Zone + 'S_WGS84.tif'
-                topophase_full_out_fname_utm = label_txt + 'FULL_topophase_m_yr_' + date_str + '_UTM_' + Zone + 'S_WGS84.tif'
             else:
                 phsig_out_fname_utm = 'phsig_'+ date_str + '_UTM' + Zone + 'S_WGS84.tif'
                 conncomp_out_fname_utm = 'conncomp_' + date_str + '_UTM_' + Zone + 'S_WGS84.tif'
+                topophasecor_out_fname_utm = 'topophase_cor_' + date_str + '_UTM_' + Zone + 'S_WGS84.tif'
+                topophase_out_fname_utm = 'topophase_unw_' + date_str + '_UTM_' + Zone + 'S_WGS84.tif'
                 amp_out_fname_utm = 'amp_' + date_str + '_UTM_' + Zone + 'S_WGS84.tif'
-                topophase_out_fname_utm = 'topophase_' + date_str + '_UTM_' + Zone + 'S_WGS84.tif'
                 topophase_myr_out_fname_utm = 'topophase_m_yr_' + date_str + '_UTM_' + Zone + 'S_WGS84.tif'
-                topophase_full_out_fname_utm = 'FULL_topophase_m_yr_' + date_str + '_UTM_' + Zone + 'S_WGS84.tif'
+                topophase2stage_out_fname_utm = label_txt + '_topophase_2stage_unw_' + date_str + '_UTM_' + Zone + 'S_WGS84.tif'
 
 
         if os.path.exists(os.path.join(dir2process_merged,topophase_myr_out_fname_utm)) == False:
@@ -477,7 +490,21 @@ def generate_single_geotif_utm(dir2process, dir2process_merged, label_txt, basel
             with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
                 subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
                 subprocess_p.wait()
-            cmd = ['gdalinfo', '-hist', '-stats', os.path.join(dir2process_merged,topophase_myr_out_fname_utm)]
+            cmd = ['gdalinfo', '-mm', '-hist', '-stats', os.path.join(dir2process_merged,topophase_myr_out_fname_utm)]
+            logfile_fname = dir2process + '/log/gdalinfo_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
+            logfile_error_fname = dir2process + '/log/gdalinfo_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
+            with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
+                subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
+                subprocess_p.wait()
+
+        if os.path.exists(os.path.join(dir2process_merged,topophasecor_out_fname_utm)) == False:
+            cmd = ['gdalwarp', '-srcnodata', '0', '-dstnodata', '0', '-multi', '-tap', '-tr', str(dem_res), str(dem_res), '-t_srs', prj, '-r', 'bilinear', '-co', 'COMPRESS=LZW', '-co', 'predictor=2', topophasecor_out_fname, os.path.join(dir2process_merged,topophasecor_out_fname_utm)]
+            logfile_fname = dir2process + '/log/gdalwarp_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
+            logfile_error_fname = dir2process + '/log/gdalwarp_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
+            with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
+                subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
+                subprocess_p.wait()
+            cmd = ['gdalinfo', '-mm', '-hist', '-stats', os.path.join(dir2process_merged,topophasecor_out_fname_utm)]
             logfile_fname = dir2process + '/log/gdalinfo_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
             logfile_error_fname = dir2process + '/log/gdalinfo_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
             with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
@@ -491,7 +518,21 @@ def generate_single_geotif_utm(dir2process, dir2process_merged, label_txt, basel
             with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
                 subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
                 subprocess_p.wait()
-            cmd = ['gdalinfo', '-hist', '-stats', os.path.join(dir2process_merged,topophase_out_fname_utm)]
+            cmd = ['gdalinfo', '-mm', '-hist', '-stats', os.path.join(dir2process_merged,topophase_out_fname_utm)]
+            logfile_fname = dir2process + '/log/gdalinfo_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
+            logfile_error_fname = dir2process + '/log/gdalinfo_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
+            with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
+                subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
+                subprocess_p.wait()
+
+        if os.path.exists(os.path.join(dir2process_merged,topophase2stage_out_fname_utm)) == False:
+            cmd = ['gdalwarp', '-srcnodata', '0', '-dstnodata', '0', '-multi', '-tap', '-tr', str(dem_res), str(dem_res), '-t_srs', prj, '-r', 'bilinear', '-co', 'COMPRESS=LZW', '-co', 'predictor=2', filttopohase2stage_out_fname, os.path.join(dir2process_merged,topophase2stage_out_fname_utm)]
+            logfile_fname = dir2process + '/log/gdalwarp_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
+            logfile_error_fname = dir2process + '/log/gdalwarp_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
+            with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
+                subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
+                subprocess_p.wait()
+            cmd = ['gdalinfo', '-mm', '-hist', '-stats', os.path.join(dir2process_merged,topophase2stage_out_fname_utm)]
             logfile_fname = dir2process + '/log/gdalinfo_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
             logfile_error_fname = dir2process + '/log/gdalinfo_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
             with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
@@ -505,7 +546,7 @@ def generate_single_geotif_utm(dir2process, dir2process_merged, label_txt, basel
             with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
                 subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
                 subprocess_p.wait()
-            cmd = ['gdalinfo', '-hist', '-stats', os.path.join(dir2process_merged,amp_out_fname_utm)]
+            cmd = ['gdalinfo', '-mm', '-hist', '-stats', os.path.join(dir2process_merged,amp_out_fname_utm)]
             logfile_fname = dir2process + '/log/gdalinfo_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
             logfile_error_fname = dir2process + '/log/gdalinfo_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
             with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
@@ -519,7 +560,7 @@ def generate_single_geotif_utm(dir2process, dir2process_merged, label_txt, basel
             with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
                 subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
                 subprocess_p.wait()
-            cmd = ['gdalinfo', '-hist', '-stats', os.path.join(dir2process_merged,phsig_out_fname_utm)]
+            cmd = ['gdalinfo', '-mm', '-hist', '-stats', os.path.join(dir2process_merged,phsig_out_fname_utm)]
             logfile_fname = dir2process + '/log/gdalinfo_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
             logfile_error_fname = dir2process + '/log/gdalinfo_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
             with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
@@ -533,21 +574,7 @@ def generate_single_geotif_utm(dir2process, dir2process_merged, label_txt, basel
             with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
                 subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
                 subprocess_p.wait()
-            cmd = ['gdalinfo', '-hist', '-stats', os.path.join(dir2process_merged,conncomp_out_fname_utm)]
-            logfile_fname = dir2process + '/log/gdalinfo_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
-            logfile_error_fname = dir2process + '/log/gdalinfo_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
-            with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
-                subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
-                subprocess_p.wait()
-
-        if os.path.exists(os.path.join(dir2process_merged,topophase_full_out_fname_utm)) == False:
-            cmd = ['gdalwarp', '-srcnodata', '0', '-dstnodata', '0', '-multi', '-tap', '-tr', str(dem_res), str(dem_res), '-t_srs', prj, '-r', 'bilinear', '-co', 'COMPRESS=LZW', '-co', 'predictor=2', 'merged/topophase.cor.full.geo.tif', os.path.join(dir2process_merged,topophase_full_out_fname_utm)]
-            logfile_fname = dir2process + '/log/gdalwarp_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
-            logfile_error_fname = dir2process + '/log/gdalwarp_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
-            with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
-                subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
-                subprocess_p.wait()
-            cmd = ['gdalinfo', '-hist', '-stats', os.path.join(dir2process_merged,topophase_full_out_fname_utm)]
+            cmd = ['gdalinfo', '-mm', '-hist', '-stats', os.path.join(dir2process_merged,conncomp_out_fname_utm)]
             logfile_fname = dir2process + '/log/gdalinfo_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
             logfile_error_fname = dir2process + '/log/gdalinfo_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
             with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
@@ -645,7 +672,7 @@ def generate_single_png(topophase_min, topophase_max, indir, dir2process_merged,
         subprocess_p = subprocess.Popen(cmd5d, stdout=out, stderr=err)
         subprocess_p.wait()
 
-    if dem_flag == 1:
+    if dem_flag == True:
         cmd6a = ['mdx.py', '-P', 'merged/dem.crop']
         cmd6b = ['convert', '-despeckle', '-resize', '75%', 'out.ppm', 'dem_' + date2process + '.png']
         cmd6c = ['rm', 'out.ppm']
@@ -662,9 +689,9 @@ def generate_single_png(topophase_min, topophase_max, indir, dir2process_merged,
             subprocess_p = subprocess.Popen(cmd6d, stdout=out, stderr=err)
             subprocess_p.wait()
 
-    append_list = glob.glob(os.path.join('*_' + date2process + '.png'))
-    #print append_list
+    append_list = glob.glob('*_' + date2process + '.png')
     append_list.sort()
+    #print append_list
     png_file_basename = []
     for png_file in append_list:
         png_file_basename.append(os.path.basename(png_file))
@@ -690,8 +717,8 @@ def generate_single_png(topophase_min, topophase_max, indir, dir2process_merged,
             subprocess_p = subprocess.Popen(cmd7a, stdout=out, stderr=err)
             subprocess_p.wait()
 
-    if (len(png_file_basename) > 4):
-        cmd6a = ['convert', png_file_basename[0], png_file_basename[1], png_file_basename[2], png_file_basename[3], png_file_basename[4], '+append', 'merged_views_' + dir2process + '.png']
+    elif (len(png_file_basename) > 4):
+        cmd6a = ['convert', png_file_basename[0], png_file_basename[1], png_file_basename[2], png_file_basename[3], png_file_basename[4], '+append', 'merged_views_' + date2process + '.png']
         #cmd6b = ['convert', 'merged_views_' + date2process + '.png', 'merged_views_' + date2process  + '.pdf']
     	cmd6c = ['mogrify', '-format', "png", '-font', 'Liberation-Sans', '-fill', 'white', '-undercolor', '#00000080', '-pointsize', '256',  '-gravity', 'SouthEast', '-annotate', '+10+10', date2process, 'merged_views_' + date2process + '.png']
         logfile_fname = 'log/png_append_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
@@ -712,7 +739,7 @@ def generate_single_png(topophase_min, topophase_max, indir, dir2process_merged,
             subprocess_p.wait()
 
     elif (len(png_file_basename) == 4):
-        cmd6a = ['convert', png_file_basename[0], png_file_basename[1], png_file_basename[2], png_file_basename[3], '+append', 'merged_views_' + dir2process + '.png']
+        cmd6a = ['convert', png_file_basename[0], png_file_basename[1], png_file_basename[2], png_file_basename[3], '+append', 'merged_views_' + date2process + '.png']
         #cmd6b = ['convert', 'merged_views_' + date2process + '.png', 'merged_views_' + date2process  + '.pdf']
     	cmd6c = ['mogrify', '-format', "png", '-font', 'Liberation-Sans', '-fill', 'white', '-undercolor','#00000080', '-pointsize', '256',  '-gravity', 'SouthEast', '-annotate', '+10+10', date2process, 'merged_views_' + date2process + '.png']
         logfile_fname = 'log/png_append_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
@@ -732,12 +759,17 @@ def generate_single_png(topophase_min, topophase_max, indir, dir2process_merged,
             subprocess_p = subprocess.Popen(cmd7a, stdout=out, stderr=err)
             subprocess_p.wait()
 
-
-def build_xmls(idx, master_slave_string, indir, swath, orbit_dir, aux_dir, Sentinel1_full_dirname, date, ImgSceneCenterDate, ImgSceneCenterDateTime):
+def build_xmls(idx, master_slave_string, indir, swath, orbit_dir, aux_dir, Sentinel1_full_zipname, Sentinel1_full_dirname, date, ImgSceneCenterDate, ImgSceneCenterDateTime):
     xmlfile_master = str(date) + '.xml'
     xmldirfile_master = os.path.join(indir, xmlfile_master)
     #output_directory = os.path.join(dirname_full_swath, master_slave_string)
-    Sentinel1_full_zipname = Sentinel1_full_dirname[idx][:-4] + 'zip'
+    try:
+        idx2 = idx[0]
+    except IndexError:
+        idx2 = idx
+    idx = idx2
+    idx2 = None
+    Sentinel1_full_zipname_idx = Sentinel1_full_zipname[idx]
     #out_swath_dir = 'output_swath' + str(swath)
     output_directory = os.path.join(Sentinel1_full_dirname[idx], master_slave_string)
 #    if os.path.exists(output_directory) == False:
@@ -752,7 +784,7 @@ def build_xmls(idx, master_slave_string, indir, swath, orbit_dir, aux_dir, Senti
     f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
     f.write('<component name="master">\n')
     f.write('       <property name="safe">\n')
-    f.write('           <value>"%s"</value>\n' % Sentinel1_full_zipname)
+    f.write('           <value>"%s"</value>\n' % Sentinel1_full_zipname_idx)
     f.write('       </property>\n')
 #    f.write('       <property name="swath number">\n')
 #    f.write('           <value>%s</value>\n' % swath)
@@ -774,8 +806,14 @@ ImgSceneCenterDate = []
 ImgSceneCenterTime = []
 Sentinel1_dirname = []
 Sentinel1_full_dirname = []
+tfname_full_zip_list = []
+Sentinel1_zipname = []
+Sentinel1_full_zipname = []
+Sentinel1_zipname_merged = []
+Sentinel1_full_zipname_merged = []
+
 counter = 0
-#get list of tar.gz files
+#get list of .zip or .tar.gz files
 if len(glob.glob(os.path.join(indir,"S1?_IW_SLC__*.zip"))) > 0:
     tar_filelist = sorted(glob.glob(os.path.join(indir,"S1?_IW_SLC__*.zip")))
 #    if len(tar_filelist) == 0 and len(glob.glob(os.path.join(indir,"SO_*.tar.gz"))) > 0:
@@ -794,17 +832,34 @@ if len(glob.glob(os.path.join(indir,"S1?_IW_SLC__*.zip"))) > 0:
 #            print('... exists'),
         #now extract date and timing
         tfname_zip = os.path.basename(os.path.join(os.path.dirname(file), fname_out + '.zip'))
+        tfname_full_zip = os.path.join(os.path.dirname(file), fname_out + '.zip')
         tfname = os.path.basename(os.path.join(os.path.dirname(file), fname_out + '.SAFE'))
         tfname_full = os.path.join(os.path.dirname(file), fname_out + '.SAFE')
         fname_date = tfname[17:25]
         fname_time = tfname[26:32]
+        tfname_full_zip_list.append(tfname_full_zip)
+#        if fname_date in ImgSceneCenterDate:
+#            ImgSceneCenterDateTime2merge.append(ImgSceneCenterDateTime[-1])
+#            tfname_zip_list2merge.append('"' + tfname_full_zip_list[-1]'", "' + tfname_full_zip + '"')
+
         if fname_date not in ImgSceneCenterDate:
             ImgSceneCenterDateTime.append(datetime.datetime(int(fname_date[0:4]), int(fname_date[4:6]), int(fname_date[6:8]), int(fname_time[0:2]), int(fname_time[2:4]), int(fname_time[4:6])))
             ImgSceneCenterDate.append(fname_date)
             ImgSceneCenterTime.append(fname_time)
             Sentinel1_dirname.append(tfname)
             Sentinel1_full_dirname.append(tfname_full)
+            Sentinel1_zipname.append(tfname_zip)
+            Sentinel1_full_zipname.append(tfname_full_zip)
             counter = counter + 1
+        elif fname_date in ImgSceneCenterDate:
+            #file should be combined with existing SAFE/zip file. Because files are sorted, it is the previous file
+            Sentinel1_zipname_merged.append([Sentinel1_zipname[-1], tfname_zip])
+            Sentinel1_zipname.pop()
+            Sentinel1_zipname.append(Sentinel1_zipname_merged[-1])
+            Sentinel1_full_zipname_merged.append([Sentinel1_full_zipname[-1], tfname_zip])
+            Sentinel1_full_zipname.pop()
+            Sentinel1_full_zipname.append(Sentinel1_full_zipname_merged[-1])
+
 elif len(glob.glob(os.path.join(indir,"S1?_IW_SLC__*.SAFE"))) > 0:
     SAFE_filelist = sorted(glob.glob(os.path.join(indir,"S1?_IW_SLC__*.SAFE")))
     for file in SAFE_filelist:
@@ -834,11 +889,18 @@ ImgSceneCenterDate_unique = np.unique(ImgSceneCenterDate_int)
 for date in ImgSceneCenterDate_unique:
     idx = np.where(ImgSceneCenterDate_int == date)
     idx = idx[0]
+
     #now iterate through that index and generate xml files
     #same indices indicate same days
     if len(idx) > 1:
         idx = idx[0]
-    [output_master_directory, xmldirfile_master, Sentinel1A_full_master_dirname] = build_xmls(idx, 'master', indir, swath, orbit_dir, aux_dir, Sentinel1_full_dirname, date, ImgSceneCenterDate, ImgSceneCenterDateTime)
+    [output_master_directory, xmldirfile_master, Sentinel1A_full_master_dirname] = build_xmls(idx, 'master', indir, swath, orbit_dir, aux_dir, Sentinel1_full_zipname, Sentinel1_full_dirname, date, ImgSceneCenterDate, ImgSceneCenterDateTime)
+    try:
+        idx2 = idx[0]
+    except IndexError:
+        idx2 = idx
+    idx = idx2
+    idx2 = None
 
     #generate pairs, starting with first data
     #only use pairs that have same number of images (i.e. are on the same row/path)
@@ -869,11 +931,17 @@ for date in ImgSceneCenterDate_unique:
         cidx = cidx[0]
         if cidx.size > 1:
             cidx = cidx[0]
+        try:
+            cidx2 = cidx[0]
+        except IndexError:
+            cidx2 = cidx
+        cidx = cidx2
+        cidx2 = None
         #make sure that only the same orbits are combined
 
         #now iterate through that index and generate xml files
         #same indices indicate same days
-        [output_slave_directory, xmldirfile_slave, Sentinel1A_full_slave_dirname] = build_xmls(cidx, 'slave', indir, swath, orbit_dir, aux_dir, Sentinel1_full_dirname, cdate, ImgSceneCenterDate, ImgSceneCenterDateTime)
+        [output_slave_directory, xmldirfile_slave, Sentinel1A_full_slave_dirname] = build_xmls(cidx, 'slave', indir, swath, orbit_dir, aux_dir, Sentinel1_full_zipname, Sentinel1_full_dirname, cdate, ImgSceneCenterDate, ImgSceneCenterDateTime)
 
         #now generate controlling xml file
         topsApp_fname = dirname + '.xml'
@@ -935,150 +1003,155 @@ for date in ImgSceneCenterDate_unique:
             if os.path.exists(os.path.join(dst, os.path.basename(dem_file_vrt_fname))) == False:
                 os.symlink(dem_file_vrt_fname, os.path.join(dst, os.path.basename(dem_file_vrt_fname)))
 
-        #now call topsApp.py to determine baseline for this interferogram
-        if os.path.exists(os.path.join(dirname_full_swath,  'log')) == False:
-            os.mkdir(os.path.join(dirname_full_swath, 'log'))
-        perp_baseline = np.nan
-        perp_baseline_bottom = np.nan
-        perp_baseline_top = np.nan
-
-        origWD = os.getcwd() # remember our original working directory
-        if os.path.exists(os.path.join(dirname_full_swath, 'isce.log')) == False:
-            #only run for files that don't exist yet
-            cmd = ['topsApp.py', '--steps', '--end=computeBaselines', topsApp_fname_full]
-            print('Compute baselines: ' + ' '.join(cmd))
-            os.chdir(dirname_full_swath)
-            if os.path.exists('log') == False:
-                os.mkdir('log')
-            logfile_fname = 'log/topsApp_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
-            logfile_error_fname = 'log/topsApp_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
-            with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
-                subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
-                subprocess_p.wait()
-        if 'Bperp' in open(os.path.join(dirname_full_swath, 'isce.log')).read():
-            searchfile = open(os.path.join(dirname_full_swath, 'isce.log'), "r")
-            perp_baseline_top_list = []
-            perp_baseline_bottom_list = []
-            for line in searchfile:
-                if "Bperp at midrange for first common burst" in line:
-                    perp_baseline_top = float(line.split(' = ')[-1])
-                    perp_baseline_top_list.append(perp_baseline_top)
-            searchfile.seek(0)
-            for line in searchfile:
-                if "Bperp at midrange for last common burst" in line:
-                    perp_baseline_bottom = float(line.split(' = ')[-1])
-                    perp_baseline_bottom_list.append(perp_baseline_bottom)
-            searchfile.close()
-            perp_baseline_top = np.mean(perp_baseline_top_list)
-            perp_baseline_bottom = np.mean(perp_baseline_bottom_list)
-        if np.isnan(perp_baseline_bottom):
-            #no perp_baseline, no baseline computed
-            logfile_error_fname = max(glob.iglob(os.path.join(dirname_full_swath,'log/topsApp_*_err.txt')), key=os.path.getctime)
-            if 'Exception: No suitable orbit file found.' in open(os.path.join(dirname_full_swath, logfile_error_fname)).read():
-                #precise orbts are not here
-                print 'Precise orbits for ' + topsApp_fname_full + ' is missing'
-                #write xml file to list
-                no_precise_orbits_fn =  'list_of_missing_precise_orbits_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
-                no_precise_orbits_fn_fp =  os.path.join(indir, no_precise_orbits_fn)
-                f = open(no_precise_orbits_fn_fp, 'a+')
-                f.write('%s\t: %s\n' %(datetime.datetime.now().strftime('%Y%b%d_%H%M%S'), topsApp_fname_full))
-                f.close()
-            if 'Exception: Could not determine a suitable burst offset' in open(os.path.join(dirname_full_swath, logfile_error_fname)).read():
-                print 'Could not determine burst offset for ' + topsApp_fname_full
-                #write xml file to list
-                if 'no_burst_offset_fn' not in locals():
-                    # myVar exists.
-                    no_burst_offset_fn =  'list_of_burst_offset_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
-                    no_burst_offset_fn_fp =  os.path.join(indir, no_burst_offset_fn)
-                f = open(no_burst_offset_fn_fp, 'a+')
-                f.write('%s\t: %s\n' %(datetime.datetime.now().strftime('%Y%b%d_%H%M%S'), topsApp_fname_full))
-                f.close()
-
-#        if os.path.exists(os.path.join(dirname_full_swath, output_master_directory)) == False or os.path.exists(os.path.join(dirname_full_swath, output_slave_directory)) == False:
-#            if 'baseline.Bperp' in open(os.path.join(dirname_full_swath, 'isce.log')).read():
-#                searchfile = open(os.path.join(dirname_full_swath, 'isce.log'), "r")
-#                for line in searchfile:
-#                    if "baseline.Bperp at midrange for first common burst" in line:
-#                        perp_baseline_top = float(line.split(' = ')[-1])
-#                        break
-#                for line in searchfile:
-#                    if "baseline.Bperp at midrange for last common burst" in line:
-#                        perp_baseline_bottom = float(line.split(' = ')[-1])
-#                        break
-#                searchfile.close()
-#            else:
-#                cmd = ['topsApp.py', '--steps', '--end=computeBaselines', topsApp_fname_full]
-#                print('Re-Running: ' + ' '.join(cmd))
-#                os.chdir(dirname_full_swath)
-#                logfile_fname = 'log/topsApp_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
-#                logfile_error_fname = 'log/topsApp_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
-#                with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
-#                    subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
-#                    subprocess_p.wait()
-
-        #extract perpendicular baseline from file insarProc.xml
-        #filestats = os.stat(os.path.join(dirname_full_swath, 'insarProc.xml'))
-        try:
-            perp_baseline_bottom
-        except NameError:
-            print('No perpendicular baseline found. Break.')
+        if proc_steps >= 0:
+            #now call topsApp.py to determine baseline for this interferogram
+            if os.path.exists(os.path.join(dirname_full_swath,  'log')) == False:
+                os.mkdir(os.path.join(dirname_full_swath, 'log'))
             perp_baseline = np.nan
             perp_baseline_bottom = np.nan
             perp_baseline_top = np.nan
-            break
-        if perp_baseline_bottom != 0 and np.isnan(perp_baseline_bottom) == False:
-            #insarProc.xml contains sufficient data
-            #os.chdir(dirname_full_swath)
-            #tree = ET.parse(os.path.join(dirname_full_swath, 'insarProc.xml'))
-            #perp_baseline_top = float(tree.find('baseline/perp_baseline_top').text)
-            #perp_baseline_bottom = float(tree.find('baseline/perp_baseline_bottom').text)
-            perp_baseline = np.mean([perp_baseline_top, perp_baseline_bottom])
-            print('Perpendicular baseline (m): ' + str(perp_baseline))
-            #os.chdir(origWD) #change back to original directory
-            #store relevant data
-            date_dt = datetime.datetime(int(str(date)[0:4]), int(str(date)[4:6]), int(str(date)[6:8]), 0, 0)
-            cdate_dt = datetime.datetime(int(str(cdate)[0:4]), int(str(cdate)[4:6]), int(str(cdate)[6:8]), 0, 0)
-            deltadate = cdate_dt - date_dt
-            deltadate_yr = deltadate.total_seconds()/(365*24*60*60)
-            #print([date, cdate, deltadate_yr, perp_baseline, len(idx), Sentinel1_dirname[idx], Sentinel1_dirname[cidx]])
-            if idx.shape == ():
-                baseline_results.append([date, cdate, deltadate_yr, perp_baseline, idx+1, Sentinel1_dirname[idx], Sentinel1_dirname[cidx]])
-            else:
-                baseline_results.append([date, cdate, deltadate_yr, perp_baseline, len(idx), Sentinel1_dirname[idx], Sentinel1_dirname[cidx]])
-            if abs(perp_baseline) > PERP_BASELINE_THRESHOLD:
-                #remove files from subdir to save storage
-                files2remove = os.path.join(dirname_full_swath, str(date))
-                files2remove = files2remove + '.raw*'
-                files2remove=glob.glob(files2remove)
-                for i in files2remove:
-                    os.remove(i)
-                files2remove = os.path.join(dirname_full_swath, str(date))
-                files2remove = files2remove + '.iq*'
-                files2remove=glob.glob(files2remove)
-                for i in files2remove:
-                    os.remove(i)
-                files2remove = os.path.join(dirname_full_swath, str(cdate))
-                files2remove = files2remove + '.raw*'
-                files2remove=glob.glob(files2remove)
-                for i in files2remove:
-                    os.remove(i)
-                files2remove = os.path.join(dirname_full_swath, str(cdate))
-                files2remove = files2remove + '.iq*'
-                files2remove=glob.glob(files2remove)
-                for i in files2remove:
-                    os.remove(i)
-                if os.path.exists(os.path.join(dirname_full_swath,'PICKLE')):
-                    shutil.rmtree(os.path.join(dirname_full_swath,'PICKLE'))
-            else:
+
+            origWD = os.getcwd() # remember our original working directory
+            if os.path.exists(os.path.join(dirname_full_swath, 'isce.log')) == False:
+                #only run for files that don't exist yet
+                cmd = ['topsApp.py', '--steps', '--end=computeBaselines', topsApp_fname_full]
+                print('Compute baselines: ' + ' '.join(cmd))
+                os.chdir(dirname_full_swath)
+                if os.path.exists('log') == False:
+                    os.mkdir('log')
+                logfile_fname = 'log/topsApp_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
+                logfile_error_fname = 'log/topsApp_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
+                with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
+                    subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
+                    subprocess_p.wait()
+            if 'Bperp' in open(os.path.join(dirname_full_swath, 'isce.log')).read():
+                searchfile = open(os.path.join(dirname_full_swath, 'isce.log'), "r")
+                perp_baseline_top_list = []
+                perp_baseline_bottom_list = []
+                for line in searchfile:
+                    if "Bperp at midrange for first common burst" in line:
+                        perp_baseline_top = float(line.split(' = ')[-1])
+                        perp_baseline_top_list.append(perp_baseline_top)
+                searchfile.seek(0)
+                for line in searchfile:
+                    if "Bperp at midrange for last common burst" in line:
+                        perp_baseline_bottom = float(line.split(' = ')[-1])
+                        perp_baseline_bottom_list.append(perp_baseline_bottom)
+                searchfile.close()
+                perp_baseline_top = np.mean(perp_baseline_top_list)
+                perp_baseline_bottom = np.mean(perp_baseline_bottom_list)
+            if np.isnan(perp_baseline_bottom):
+                #no perp_baseline, no baseline computed
+                logfile_error_fname = max(glob.iglob(os.path.join(dirname_full_swath,'log/topsApp_*_err.txt')), key=os.path.getctime)
+                if 'Exception: No suitable orbit file found.' in open(os.path.join(dirname_full_swath, logfile_error_fname)).read():
+                    #precise orbts are not here
+                    print 'Precise orbits for ' + topsApp_fname_full + ' is missing'
+                    #write xml file to list
+                    no_precise_orbits_fn =  'list_of_missing_precise_orbits_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
+                    no_precise_orbits_fn_fp =  os.path.join(indir, no_precise_orbits_fn)
+                    f = open(no_precise_orbits_fn_fp, 'a+')
+                    f.write('%s\t: %s\n' %(datetime.datetime.now().strftime('%Y%b%d_%H%M%S'), topsApp_fname_full))
+                    f.close()
+                if 'Exception: Could not determine a suitable burst offset' in open(os.path.join(dirname_full_swath, logfile_error_fname)).read():
+                    print 'Could not determine burst offset for ' + topsApp_fname_full
+                    #write xml file to list
+                    if 'no_burst_offset_fn' not in locals():
+                        # myVar exists.
+                        no_burst_offset_fn =  'list_of_burst_offset_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
+                        no_burst_offset_fn_fp =  os.path.join(indir, no_burst_offset_fn)
+                    f = open(no_burst_offset_fn_fp, 'a+')
+                    f.write('%s\t: %s\n' %(datetime.datetime.now().strftime('%Y%b%d_%H%M%S'), topsApp_fname_full))
+                    f.close()
+
+    #        if os.path.exists(os.path.join(dirname_full_swath, output_master_directory)) == False or os.path.exists(os.path.join(dirname_full_swath, output_slave_directory)) == False:
+    #            if 'baseline.Bperp' in open(os.path.join(dirname_full_swath, 'isce.log')).read():
+    #                searchfile = open(os.path.join(dirname_full_swath, 'isce.log'), "r")
+    #                for line in searchfile:
+    #                    if "baseline.Bperp at midrange for first common burst" in line:
+    #                        perp_baseline_top = float(line.split(' = ')[-1])
+    #                        break
+    #                for line in searchfile:
+    #                    if "baseline.Bperp at midrange for last common burst" in line:
+    #                        perp_baseline_bottom = float(line.split(' = ')[-1])
+    #                        break
+    #                searchfile.close()
+    #            else:
+    #                cmd = ['topsApp.py', '--steps', '--end=computeBaselines', topsApp_fname_full]
+    #                print('Re-Running: ' + ' '.join(cmd))
+    #                os.chdir(dirname_full_swath)
+    #                logfile_fname = 'log/topsApp_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '.txt'
+    #                logfile_error_fname = 'log/topsApp_' + datetime.datetime.now().strftime('%Y%b%d_%H%M%S') + '_err.txt'
+    #                with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
+    #                    subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
+    #                    subprocess_p.wait()
+
+            #extract perpendicular baseline from file insarProc.xml
+            #filestats = os.stat(os.path.join(dirname_full_swath, 'insarProc.xml'))
+            try:
+                perp_baseline_bottom
+            except NameError:
+                print('No perpendicular baseline found. Break.')
+                perp_baseline = np.nan
+                perp_baseline_bottom = np.nan
+                perp_baseline_top = np.nan
+                break
+            if perp_baseline_bottom != 0 and np.isnan(perp_baseline_bottom) == False:
+                #insarProc.xml contains sufficient data
+                #os.chdir(dirname_full_swath)
+                #tree = ET.parse(os.path.join(dirname_full_swath, 'insarProc.xml'))
+                #perp_baseline_top = float(tree.find('baseline/perp_baseline_top').text)
+                #perp_baseline_bottom = float(tree.find('baseline/perp_baseline_bottom').text)
+                perp_baseline = np.mean([perp_baseline_top, perp_baseline_bottom])
+                print('Perpendicular baseline (m): ' + str(perp_baseline))
+                #os.chdir(origWD) #change back to original directory
+                #store relevant data
+                date_dt = datetime.datetime(int(str(date)[0:4]), int(str(date)[4:6]), int(str(date)[6:8]), 0, 0)
+                cdate_dt = datetime.datetime(int(str(cdate)[0:4]), int(str(cdate)[4:6]), int(str(cdate)[6:8]), 0, 0)
+                deltadate = cdate_dt - date_dt
+                deltadate_yr = deltadate.total_seconds()/(365*24*60*60)
+                #print([date, cdate, deltadate_yr, perp_baseline, len(idx), Sentinel1_dirname[idx], Sentinel1_dirname[cidx]])
                 if idx.shape == ():
-                    baseline_results_lt_threshold.append([date, cdate, deltadate_yr, perp_baseline, 2,  Sentinel1_dirname[idx], Sentinel1_dirname[cidx]])
-                    baseline_results_lt_threshold_conncomp_los.append([date, cdate, deltadate_yr, perp_baseline, 2,  Sentinel1_dirname[idx], Sentinel1_dirname[cidx]])
+                    baseline_results.append([date, cdate, deltadate_yr, perp_baseline, idx+1, Sentinel1_dirname[idx], Sentinel1_dirname[cidx]])
                 else:
-                    baseline_results_lt_threshold.append([date, cdate, deltadate_yr, perp_baseline, 1,  Sentinel1_dirname[idx], Sentinel1_dirname[cidx]])
-                    baseline_results_lt_threshold_conncomp_los.append([date, cdate, deltadate_yr, perp_baseline, 1,  Sentinel1_dirname[idx], Sentinel1_dirname[cidx]])
-        else:
-            #insarProc too small
-            baseline_results.append([date, cdate, -9999, -9999, len(idx), -9999, -9999])
+                    baseline_results.append([date, cdate, deltadate_yr, perp_baseline, np.size(idx), Sentinel1_dirname[idx], Sentinel1_dirname[cidx]])
+                if abs(perp_baseline) > PERP_BASELINE_THRESHOLD:
+                    #remove files from subdir to save storage
+                    files2remove = os.path.join(dirname_full_swath, str(date))
+                    files2remove = files2remove + '.raw*'
+                    files2remove=glob.glob(files2remove)
+                    for i in files2remove:
+                        os.remove(i)
+                    files2remove = os.path.join(dirname_full_swath, str(date))
+                    files2remove = files2remove + '.iq*'
+                    files2remove=glob.glob(files2remove)
+                    for i in files2remove:
+                        os.remove(i)
+                    files2remove = os.path.join(dirname_full_swath, str(cdate))
+                    files2remove = files2remove + '.raw*'
+                    files2remove=glob.glob(files2remove)
+                    for i in files2remove:
+                        os.remove(i)
+                    files2remove = os.path.join(dirname_full_swath, str(cdate))
+                    files2remove = files2remove + '.iq*'
+                    files2remove=glob.glob(files2remove)
+                    for i in files2remove:
+                        os.remove(i)
+                    if os.path.exists(os.path.join(dirname_full_swath,'PICKLE')):
+                        shutil.rmtree(os.path.join(dirname_full_swath,'PICKLE'))
+                else:
+                    if idx.shape == ():
+                        baseline_results_lt_threshold.append([date, cdate, deltadate_yr, perp_baseline, 2,  Sentinel1_dirname[idx], Sentinel1_dirname[cidx]])
+                        baseline_results_lt_threshold_conncomp_los.append([date, cdate, deltadate_yr, perp_baseline, 2,  Sentinel1_dirname[idx], Sentinel1_dirname[cidx]])
+                    else:
+                        baseline_results_lt_threshold.append([date, cdate, deltadate_yr, perp_baseline, 1,  Sentinel1_dirname[idx], Sentinel1_dirname[cidx]])
+                        baseline_results_lt_threshold_conncomp_los.append([date, cdate, deltadate_yr, perp_baseline, 1,  Sentinel1_dirname[idx], Sentinel1_dirname[cidx]])
+            else:
+                #insarProc too small
+                baseline_results.append([date, cdate, -9999, -9999, np.size(idx), -9999, -9999])
+
+if proc_steps == -1:
+    print 'Finished generating xml files. Exiting'
+    sys.exit()
 
 #write all baselines
 baseline_results_csv = os.path.join(indir_path, label_txt + '_baseline_results.csv')
@@ -1157,7 +1230,7 @@ if proc_steps == 3:
         cdate_dt = []
         bdate = baselinet_data[1]
         cdate_dt.append(datetime.datetime(int(str(bdate)[0:4]), int(str(bdate)[4:6]), int(str(bdate)[6:8]), 0, 0))
-    
+
     #proc_step3: write only baselines with perpendicular baseline < THRESHOLD
     baseline_fname = label_txt + '_ifg_lt_' + str(PERP_BASELINE_THRESHOLD) + '_procstep3.list'
     baseline_results_lt_threshold_csv = os.path.join(indir_path, baseline_fname)
@@ -1175,7 +1248,7 @@ for bdate in baselinea_data[:,0]:
 acdate_dt = []
 for bdate in baselinea_data[:,1]:
     acdate_dt.append(datetime.datetime(int(str(bdate)[0:4]), int(str(bdate)[4:6]), int(str(bdate)[6:8]), 0, 0))
-    
+
 if proc_steps == 0 or proc_steps > 2:
     #make plot of dates and baselines
     print 'Creating baseline figures...',
@@ -1271,25 +1344,24 @@ if proc_steps == 2:
             subprocess_p.wait()
         end_t = time.time()
         print 'Duration: ' + str(round((end_t-start_t)/60., 2)) + ' minutes or ' + str(round((end_t-start_t)/60./60., 2)) + ' hours'
-    date2process = dir2process
+    date2process = date_str
+
     if generate_png == 1:
         if os.path.exists('log') == False:
             os.mkdir('log')
         if len(glob.glob(os.path.join(indir,os.path.join(dir2process, 'merged_views_' + date2process + '.png')))) > 0:
             print 'PNG exists for: ' + os.path.join(dir2process, 'merged_views_' + date2process + '.png')
         else:
-            generate_single_png(topophase_min, topophase_max, indir, dir2process_merged, date2process, 1)
+            generate_single_png(topophase_min, topophase_max, indir, dir2process_merged, date2process, True)
 
     if generate_utm_geotif == 1:
         if os.path.exists('log') == False:
             os.mkdir('log')
-        if len(glob.glob(os.path.join(indir,os.path.join(dir2process, 'merged/*' + date2process + '.tif')))) > 0:
+        if len(glob.glob(os.path.join(indir,os.path.join(dir2process, 'merged/*' + date2process + '_UTM*_WGS84.tif')))) > 0:
             print 'Geotifs exists for: ' + date2process
         else:
             radarwavelength = 0.05546576
-            generate_single_geotif_utm(dir2process, dir2process_merged, label_txt, baselinet_data, radarwavelength)
-
-
+            generate_single_geotif_utm(dir2process, dir2process_merged, date2process, label_txt, baselinet_data, radarwavelength)
     os.chdir(origWD)
 
 
@@ -1307,7 +1379,7 @@ if proc_steps == 0 or proc_steps == 3:
         date_str = dir2process_noswath
         print '\n###Processing ' + str(i+1) + ' of ' + str(len(date_dt)) + ': ' + dir2process_noswath
         if os.path.exists(os.path.join(indir_path, 'dates_to_exclude.lst')):
-            if dir2process in open(os.path.join(indir_path, 'dates_to_exclude.lst')).read():
+            if date_str in open(os.path.join(indir_path, 'dates_to_exclude.lst')).read():
                 print 'Continuing to next. ' + dir2process_noswath + ' is in file: dates_to_exlude.lst'
                 continue
         xml2process = dir2process_noswath + '.xml'
@@ -1443,7 +1515,7 @@ if proc_steps == 0 or proc_steps == 3:
 #                width=doc[14][0].text
                 print 'rangepixelsize: (m)', rangepixelsize, ', radarwavelength: (m)', radarwavelength, '\nwidth: ', str(width), ', length: ', str(length)
                 #print 'lat1: ', lat1, ', lat2:', lat2, ', lon1: ', lon1, ', lon2: ', lon2, ', stepsize: ', stepsize_degree
-                    
+
                 #PEG_HEADING
                 os.chdir(dir2process_merged)
                 cmd = ['gdal_translate', '-ot',  'Float32', '-of', 'ENVI', 'dem.crop', 'dem.crop.float32']
@@ -1452,8 +1524,8 @@ if proc_steps == 0 or proc_steps == 3:
                 with open(logfile_fname, 'wb') as out, open(logfile_error_fname, 'wb') as err:
                     subprocess_p = subprocess.Popen(cmd, stdout=out, stderr=err)
                     subprocess_p.wait()
-    
-                os.chdir(dir2process)                
+
+                os.chdir(dir2process)
                 if os.path.exists(os.path.join(dir2process,'merged/los.rdr.geo.vrt')):
                     os.remove(os.path.join(dir2process,'merged/los.rdr.geo.vrt'))
                 cmd = ['isce2gis.py', 'vrt', '-i', 'merged/los.rdr.geo']
@@ -1490,7 +1562,7 @@ if proc_steps == 0 or proc_steps == 3:
 #                                heading  = azimuth - 90.0
 #                                PEG_HEADING = azimuth - 90.0
 #                                print 'LOS: Azimuth angle from north (degree): ' + str(float(right)) + ', azimuth = ' + str(azimuth) + ', PEG_HEADING = ' + str(PEG_HEADING)
-                os.chdir(dir2process)                
+                os.chdir(dir2process)
                 try:
                     PEG_HEADING
                 except NameError:
@@ -1510,7 +1582,7 @@ if proc_steps == 0 or proc_steps == 3:
                                     #heading  = azimuth - 90.0
                                     #PEG_HEADING = azimuth - 90.0
                                     #print 'LOS: Azimuth angle from north (degree): ' + str(float(right)) + ', azimuth = ' + str(azimuth) + ', PEG_HEADING = ' + str(PEG_HEADING)
-                
+
                 # get PEG_HEADING from isce.log
                 searchfile_iscelog = os.path.join(dir2process, 'isce.log')
                 with open(searchfile_iscelog) as searchfile:
@@ -1520,7 +1592,7 @@ if proc_steps == 0 or proc_steps == 3:
                             #print 'PEG_HEADING: ' + str(float(right))
                             PEG_HEADING = float(right)
                 print 'PEG_HEADING: ' + str(PEG_HEADING)
-                
+
                 #now convert files to format that can be read by GIANT
                 print 'Writing dem_crop_rsc: ', os.path.join(dir2process_merged,'dem.crop.float32.rsc')
                 dem_crop_rsc = open(os.path.join(dir2process_merged,'dem.crop.float32.rsc'), 'wb')
@@ -1652,15 +1724,15 @@ if proc_steps == 0 or proc_steps == 3:
                     f.write('\treturn rep\n\n')
                     f.close()
 
-                
-                
+
+
                 os.chdir(dir2process)
 
             os.chdir(dir2process)
             #remove .raw files to save space
             #remove .raw files only of processing went well!
             #print 'do_not_delete: ' + str(do_not_delete) + ', ifg_proc_ok: ' + str(ifg_proc_ok)
-            if do_not_delete == 0 and ifg_proc_ok == 1:
+            if do_not_delete == 0 and ifg_proc_ok == 1 and i > 0:
                 print 'Cleaning up and removing all processing directories and files'
 
                 if os.path.exists(os.path.join(dir2process,'coarse_coreg')):
@@ -1697,7 +1769,7 @@ if proc_steps == 0 or proc_steps == 3:
                     for j in files2remove:
                         os.remove(j)
 
-            if do_not_delete == 2 and ifg_proc_ok == 1:
+            if do_not_delete == 2 and ifg_proc_ok == 1 and i > 0:
                 print 'Cleaning up and removing some processing directories and files'
 
                 if os.path.exists(os.path.join(dir2process,'coarse_coreg')):
@@ -1740,7 +1812,7 @@ if proc_steps == 0 or proc_steps == 3:
                 if len(glob.glob(os.path.join(dir2process,os.path.join(dir2process, 'merged_views_' + date2process + '.png')))) > 0:
                     print 'PNG exists for: ' + os.path.join(dir2process, 'merged_views_' + date2process + '.png')
                 else:
-                    generate_single_png(topophase_min, topophase_max, indir, dir2process_merged, date2process, 0)
+                    generate_single_png(topophase_min, topophase_max, indir, dir2process_merged, date2process, False)
 
             if generate_utm_geotif == 1:
                 os.chdir(dir2process)
@@ -1749,9 +1821,9 @@ if proc_steps == 0 or proc_steps == 3:
                 if len(glob.glob(os.path.join(indir,os.path.join(dir2process, 'merged/*' + date2process + '.tif')))) > 0:
                     print 'Geotifs exists for: ' + date2process
                 else:
-                    generate_single_geotif_utm(dir2process, dir2process_merged, label_txt, baselinet_data, float(radarwavelength))
+                    generate_single_geotif_utm(dir2process, dir2process_merged, date2process, label_txt, baselinet_data, float(radarwavelength))
 
-    
+
     os.chdir(origWD)
     mean_fname = 'conncomp_mean.list'
     mean_fname = os.path.join(indir_path, mean_fname)
@@ -1760,7 +1832,7 @@ if proc_steps == 0 or proc_steps == 3:
             wr = csv.writer(myfile, delimiter='\t', quoting=csv.QUOTE_MINIMAL, lineterminator='\n')
             for conncomp_mean_item in conncomp_mean:
                 wr.writerow([conncomp_mean_item])
-    
+
     mean_fname = 'los_mean.list'
     mean_fname = os.path.join(indir_path, mean_fname)
     if len(los_mean) > 1:
@@ -1768,7 +1840,7 @@ if proc_steps == 0 or proc_steps == 3:
             wr = csv.writer(myfile, delimiter='\t', quoting=csv.QUOTE_MINIMAL, lineterminator='\n')
             for los_mean_item in los_mean:
                 wr.writerow([los_mean_item])
-    
+
     min_fname = 'los_min.list'
     min_fname = os.path.join(indir_path, mean_fname)
     if len(los_min) > 1:
@@ -1776,7 +1848,7 @@ if proc_steps == 0 or proc_steps == 3:
             wr = csv.writer(myfile, delimiter='\t', quoting=csv.QUOTE_MINIMAL, lineterminator='\n')
             for los_min_item in los_min:
                 wr.writerow([los_min_item])
-    
+
     max_fname = 'los_max.list'
     max_fname = os.path.join(indir_path, max_fname)
     if len(los_max) > 1:
@@ -1784,7 +1856,7 @@ if proc_steps == 0 or proc_steps == 3:
             wr = csv.writer(myfile, delimiter='\t', quoting=csv.QUOTE_MINIMAL, lineterminator='\n')
             for los_max_item in los_max:
                 wr.writerow([los_max_item])
-    
+
     mean_fname = 'los2_mean.list'
     mean_fname = os.path.join(indir_path, mean_fname)
     if len(los2_mean) > 1:
@@ -1792,7 +1864,7 @@ if proc_steps == 0 or proc_steps == 3:
             wr = csv.writer(myfile, delimiter='\t', quoting=csv.QUOTE_MINIMAL, lineterminator='\n')
             for los_mean_item in los2_mean:
                 wr.writerow([los_mean_item])
-    
+
     min_fname = 'los2_min.list'
     min_fname = os.path.join(indir_path, mean_fname)
     if len(los2_min) > 1:
@@ -1800,7 +1872,7 @@ if proc_steps == 0 or proc_steps == 3:
             wr = csv.writer(myfile, delimiter='\t', quoting=csv.QUOTE_MINIMAL, lineterminator='\n')
             for los_min_item in los2_min:
                 wr.writerow([los_min_item])
-    
+
     max_fname = 'los2_max.list'
     max_fname = os.path.join(indir_path, max_fname)
     if len(los2_max) > 1:
@@ -1808,7 +1880,7 @@ if proc_steps == 0 or proc_steps == 3:
             wr = csv.writer(myfile, delimiter='\t', quoting=csv.QUOTE_MINIMAL, lineterminator='\n')
             for los_max_item in los2_max:
                 wr.writerow([los_max_item])
-    
+
     idx_fname = 'idx_with_low_conncomp.list'
     idx_fname = os.path.join(indir_path, idx_fname)
     if len(conncomp_2use_idx) > 1:
@@ -1821,8 +1893,8 @@ if proc_steps == 0 or proc_steps == 3:
         conncomp_2use_idx_csv = csv.reader(f)
         conncomp_2use_idx = list(conncomp_2use_idx_csv)
         conncomp_2use_idx = [int(i[0]) for i in conncomp_2use_idx]
-    
-    
+
+
     ifg_fname = 'ifg.list'
     ifg_fname = os.path.join(indir_path, ifg_fname)
     with open(ifg_fname, 'wb') as myfile:
@@ -1831,7 +1903,7 @@ if proc_steps == 0 or proc_steps == 3:
         for i in range(len(conncomp_2use_idx)):
             item = baseline_results_lt_threshold[conncomp_2use_idx[i]]
             wr.writerow([item[0], item[1], item[3], sensor_name])
-    
+
     #write only baselines with perpendicular baseline < THRESHOLD
     baseline_fname = label_txt + '_conncomp_los_baseline_results_lt_' + str(PERP_BASELINE_THRESHOLD) + '.csv'
     baseline_results_lt_threshold_csv = os.path.join(indir_path, baseline_fname)
@@ -1840,7 +1912,7 @@ if proc_steps == 0 or proc_steps == 3:
         wr.writerow(['Date1', 'Date2', 'DeltaDate_yr', 'Perp_baseline', 'Nr_of_scenes', 'Scene1', 'Scene2'])
         for item in baseline_results_lt_threshold_conncomp_los:
             wr.writerow([item[0], item[1], item[2], item[3], item[4], item[5], item[6]])
-    
+
     #generate merged PDF files with 5 images per page
     os.chdir(indir)
     append_list = glob.glob(os.path.join(indir, '*/merged_views_*' + '.png'))
@@ -1880,7 +1952,7 @@ if proc_steps == 0 or proc_steps == 3:
                     subprocess_p.wait()
         png_filenames.append('merged_views_' +  str(counter) + '.png')
         counter = counter + 1
-    
+
     #convert merged_views_1.png merged_views_2.png -resize 1240x1750 -background black -compose Copy -gravity center -extent 1240x1750 -units PixelsPerInch -density 150 merged_views.pdf
     print 'Merge all PNG into one high-res PDF... '
     cmd6a = ['convert', str(' '.join(png_filenames)), '-resize', '1240x1750', '-background', 'black', '-compose', 'Copy', '-gravity', 'center', '-extent', '1240x1750', '-units', 'PixelsPerInch', '-density', '150','-quality', '50', str(label_txt) + '_all_views_1_' +  str(len(png_filenames)) + '.pdf']
@@ -1893,7 +1965,7 @@ if proc_steps == 0 or proc_steps == 3:
             subprocess_p = subprocess.Popen(cmd6a, stdout=out, stderr=err)
             subprocess_p.wait()
     print 'done'
-    
+
     print 'Merge all PNG into one low-res PDF... '
     cmd6a = ['convert', str(' '.join(png_filenames)), '-resize', '1240x1750', '-background', 'black', '-compose', 'Copy', '-gravity', 'center', '-extent', '1240x1750', '-units', 'PixelsPerInch', '-density', '72','-quality', '25', str(label_txt) + '_all_views_1_' +  str(len(png_filenames)) + '_lowres.pdf']
     print " ".join(cmd6a)
@@ -1905,7 +1977,7 @@ if proc_steps == 0 or proc_steps == 3:
             subprocess_p = subprocess.Popen(cmd6a, stdout=out, stderr=err)
             subprocess_p.wait()
     print 'done'
-    
+
 #convert DEM to GeoTIFF and Hillshade
 dem_path = os.path.abspath(dem_file).split('/')[0:-1]
 dem_path = '/'.join(dem_path)
